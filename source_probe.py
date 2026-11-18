@@ -6,14 +6,19 @@ from io import BytesIO
 import json
 import re
 import resource
+import ssl
 import sys
 from time import monotonic, process_time
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
-from urllib.request import HTTPRedirectHandler, Request, build_opener
+from urllib.request import HTTPRedirectHandler, HTTPSHandler, Request, build_opener
 from zoneinfo import ZoneInfo
 
+import certifi
 from pypdf import PdfReader
+
+TLS = ssl.create_default_context()
+TLS.load_verify_locations(cafile=certifi.where())
 
 UTC = timezone.utc
 EASTERN = ZoneInfo("America/New_York")
@@ -60,7 +65,7 @@ def fetch(label, url, limit, deadline, *, prefix=False):
         if prefix:
             request_headers["Range"] = "bytes=0-3"
         request = Request(url, headers=request_headers)
-        opener = build_opener(FixedHostRedirects())
+        opener = build_opener(FixedHostRedirects(), HTTPSHandler(context=TLS))
         with opener.open(request, timeout=min(4, deadline-started)) as response:
             record.update(http=response.status, content_type=response.headers.get_content_type())
             headers = dict((k.lower(), v) for k, v in response.headers.items())
